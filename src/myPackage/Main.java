@@ -1,35 +1,46 @@
- package myPackage;
+package myPackage;
 
-import java.util.*;
+import java.util.Scanner;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.Collections;
 
 public class Main {
-
+    private static ArrayList<CPUScheduling> cpuProcesses = new ArrayList<>();
     static Scanner sc = new Scanner(System.in);
 
     public static int algorithmSelection() {
         int algorithmSelection;
-        System.out.print("--------CPU Scheduling Algorithm---------\n"
-                + "[1] First Come First Serve (FSFC)\n"
-                + "[2] Shortest Job First (SJF) - Non-Preemtive\n"
-                + "[3] Shortest Job First (SJF) - Preemtive\n"
-                + "[4] Priority Scheduling - Non-Preemtive\n"
-                + "[5] Priority Scheduling - Preemtive\n"
-                + "\nSelect Algorithm to use: ");
+        System.out.print("""
+                         --------CPU Scheduling Algorithm---------
+                         [1] First Come First Serve (FSFC)
+                         [2] Shortest Job First (SJF) - Non-Preemtive
+                         [3] Shortest Job First (SJF) - Preemtive
+                         [4] Priority Scheduling - Non-Preemtive
+                         [5] Priority Scheduling - Preemtive
+                         
+                         Select Algorithm to use: """);
         algorithmSelection = sc.nextInt();
         while (algorithmSelection <= 0 || algorithmSelection >= 6) {
             System.out.print("Invalid input. Select from (1-5):");
             algorithmSelection = sc.nextInt();
         }
-
         return algorithmSelection;
     }
 
-    public static void inputs(ArrayList<CPUSceduling> cpuProcesses, int algorithmSelection) {
+    public static void inputs(int algorithmSelection) {
+        int processes;
+        while (true) {
+            System.out.print("How many processes do you want? ");
+            processes = sc.nextInt();
+            if (processes <= 0) {
+                System.out.println("Invalid. Processes must at least 1.");
+            } else {
+                break;
+            }
+        }
+        
         int priorityNumber = 0;
-
-        System.out.print("How many processes do you want? ");
-        int processes = sc.nextInt();
-
         for (int i = 0; i < processes; i++) {
             System.out.println("\nProcess no. " + (i + 1));
             int processID = i + 1;
@@ -41,330 +52,217 @@ public class Main {
                 System.out.print("Priority: ");
                 priorityNumber = sc.nextInt();
             }
-            cpuProcesses.add(new CPUSceduling(processID, arrivalTime, burstTime, priorityNumber));
+            cpuProcesses.add(new CPUScheduling(processID, arrivalTime, burstTime, priorityNumber));
         }
 
         System.out.print("\nInput");
         switch (algorithmSelection) {
             case 1, 2, 3 -> /* FCFS, SJF/NP & SJF/P */ {
                 System.out.println("\nProcess\t\tArrival Time\t\tBurst Time");
-                for (CPUSceduling cpu : cpuProcesses) {
+                for (CPUScheduling cpu : cpuProcesses) {
                     System.out.println(cpu.printInputFCFS_SJF());
                 }
-                System.out.println("______________________________________"
-                        + "________________\n");
+                System.out.println("______________________________________________________\n");
             }
             case 4, 5 -> /* PRIORITY/NP & PRIORITY/P */ {
                 System.out.println("\nProcess\t\tArrival Time\t\tBurst Time\t\tPriority");
-                for (CPUSceduling cpu : cpuProcesses) {
+                for (CPUScheduling cpu : cpuProcesses) {
                     System.out.println(cpu.printInputPriority());
                 }
-                System.out.println("______________________________________"
-                        + "___________________________________\n");
+                System.out.println("_________________________________________________________________________\n");
             }
 
         }
     }
 
-    public static void output(ArrayList<CPUSceduling> cpuProcesses, int algorithmSelection) {
+    public static void output(int algorithmSelection) {
         System.out.print("\n\nOutput");
         switch (algorithmSelection) {
             case 1, 2, 3 -> /* FCFS, SJF/NP & SJF/P */ {
                 System.out.println("\nProcess\t\tArrival Time\t\tBurst Time\t\tCompletion Time\t\tTurnaround Time\t\tWaiting Time");
-                for (CPUSceduling cpu : cpuProcesses) {
+                for (CPUScheduling cpu : cpuProcesses) {
                     System.out.println(cpu.printOutputFCFS_SJF());
                 }
-                System.out.print("_________________________________________________________________"
-                        + "_______________________________________________________________\n");
+                System.out.print("________________________________________________________________________________________________________________________________\n");
             }
             case 4, 5 -> /* PRIORITY/NP & PRIORITY/P */ {
                 System.out.println("\nProcess\t\tArrival Time\t\tBurst Time\t\tPriority\t\tCompletion Time\t\tTurnaround Time\t\tWaiting Time");
-                for (CPUSceduling cpu : cpuProcesses) {
+                for (CPUScheduling cpu : cpuProcesses) {
                     System.out.println(cpu.printOutputPriority());
                 }
-                System.out.print("_________________________________________________________________"
-                        + "_______________________________________________________________"
-                        + "____________________\n");
+                System.out.print("____________________________________________________________________________________________________________________________________________________\n");
             }
         }
+    }
 
+    public static int FCFS() {
+        int currentTime = 0;
+        int totalIdleTime = 0;
+
+        for (CPUScheduling cpu : cpuProcesses) {
+            if (cpu.getArrivalTime() > currentTime) {
+                cpu.setCompletionTime(cpu.getArrivalTime());
+                System.out.print("[ IDLE |" + currentTime + "-" + cpu.getCompletionTime() + " ] ");
+                totalIdleTime += cpu.getArrivalTime() - currentTime;
+                currentTime = cpu.getArrivalTime();
+            }
+            if (cpu.getArrivalTime() <= currentTime) {
+                cpu.setCompletionTime(currentTime + cpu.getBurstTime());
+                System.out.print("[ P" + cpu.getProcessID() + " | " + currentTime + "-" + cpu.getCompletionTime() + " ]");
+                currentTime = cpu.getCompletionTime();
+            }
+        }
+        return totalIdleTime;
+    }
+
+    public static int SJF(int algorithmSelection) {
+        int completed = 0;
+        int currentTime = 0;
+        int totalIdleTime = 0;
+        while (completed < cpuProcesses.size()) {
+            ArrayList<CPUScheduling> available = new ArrayList<>();
+            for (CPUScheduling cpu : cpuProcesses) {
+                if (!cpu.isFinishedProcess() && cpu.getArrivalTime() <= currentTime) {
+                    available.add(cpu);
+                }
+            }
+
+            if (available.isEmpty()) {
+                int nextArrival = Integer.MAX_VALUE;
+                for (CPUScheduling cpu : cpuProcesses) {
+                    if (!cpu.isFinishedProcess() && cpu.getArrivalTime() > currentTime) {
+                        nextArrival = Math.min(nextArrival, cpu.getArrivalTime());
+                    }
+                }
+                if (nextArrival == Integer.MAX_VALUE) {
+                    break;
+                }
+                System.out.print("[ IDLE | " + currentTime + "-" + nextArrival + " ]");
+                totalIdleTime += (nextArrival - currentTime);
+                currentTime = nextArrival;
+                continue;
+            }
+
+            CPUScheduling sjf = Collections.min(available, Comparator.comparingInt(CPUScheduling::getTotalBurstTime));
+            System.out.print("[ P" + sjf.getProcessID() + " | " + currentTime + "-");
+            if (algorithmSelection == 2) {
+                currentTime += sjf.getTotalBurstTime();
+                sjf.setTotalBurstTime(0);
+                sjf.setCompletionTime(currentTime);
+                sjf.setFinishedProcess(true);
+                completed++;
+            } else if (algorithmSelection == 3) {
+                currentTime++;
+                sjf.setTotalBurstTime(sjf.getTotalBurstTime() - 1);
+                if (sjf.getTotalBurstTime() == 0) {
+                    sjf.setFinishedProcess(true);
+                    sjf.setCompletionTime(currentTime);
+                    completed++;
+                }
+            }
+            System.out.print(currentTime + " ]");
+        }
+        return totalIdleTime;
+    }
+
+    public static int PRIORITY(int algorithmSelection) {
+        int currentTime = 0;
+        int completed = 0;
+        int totalIdleTime = 0;
+        while (completed < cpuProcesses.size()) {
+            ArrayList<CPUScheduling> available = new ArrayList<>();
+            for (CPUScheduling cpu : cpuProcesses) {
+                if (!cpu.isFinishedProcess() && cpu.getArrivalTime() <= currentTime) {
+                    available.add(cpu);
+                }
+            }
+
+            if (available.isEmpty()) {
+                int nextArrival = Integer.MAX_VALUE;
+                for (CPUScheduling cpu : cpuProcesses) {
+                    if (!cpu.isFinishedProcess() && cpu.getArrivalTime() > currentTime) {
+                        nextArrival = Math.min(nextArrival, cpu.getArrivalTime());
+                    }
+                }
+                if (nextArrival == Integer.MAX_VALUE) {
+                    break;
+                }
+                System.out.print("[ IDLE | " + currentTime + "-" + nextArrival + " ]");
+                totalIdleTime += (nextArrival - currentTime);
+                currentTime = nextArrival;
+                continue;
+            }
+
+            CPUScheduling priority = Collections.max(available, Comparator.comparingInt(CPUScheduling::getPriorityNumber));
+            System.out.print("[ P" + priority.getProcessID() + " | " + currentTime + "-");
+            if (algorithmSelection == 4) {
+                currentTime += priority.getBurstTime();
+                priority.setCompletionTime(currentTime);
+                priority.setFinishedProcess(true);
+                completed++;
+            } else if (algorithmSelection == 5) {
+                currentTime++;
+                priority.setTotalBurstTime(priority.getTotalBurstTime() - 1);
+                if (priority.getTotalBurstTime() == 0) {
+                    priority.setFinishedProcess(true);
+                    priority.setCompletionTime(currentTime);
+                    completed++;
+                }
+            }
+            System.out.print(currentTime + " ]");
+        }
+        return totalIdleTime;
     }
 
     public static void performanceMetrics(double cpuUtilization, double aTT, double aWT) {
         System.out.println("\nPerformance Metrics");
-        System.out.println("CPU Utilization Percentage: " + cpuUtilization + "%");
-        System.out.println("Average Turnaround Time (ATT): " + aTT);
-        System.out.println("Average Waiting Time (AWT): " + aWT);
+        System.out.printf("CPU Utilization Percentage: %.2f%%\n", cpuUtilization);
+        System.out.printf("Average Turnaround Time (ATT): %.2f\n", aTT);
+        System.out.printf("Average Waiting Time (AWT): %.2f\n", aWT);
     }
 
     public static void main(String[] args) {
-        ArrayList<CPUSceduling> cpuProcesses = new ArrayList<>();
-
         int algorithmSelection = algorithmSelection();
+        inputs(algorithmSelection);
 
-        inputs(cpuProcesses, algorithmSelection);
+        cpuProcesses.sort(Comparator.comparingInt(CPUScheduling::getArrivalTime));
 
-        Collections.sort(cpuProcesses, Comparator.comparingInt(cpu -> cpu.getArrivalTime()));
-
-        // Time Accumulations and Gantt Chart
         int totalBurstTime = 0;
         int totalIdleTime = 0;
-        int turnAroundTimeTotal = 0;
-        int waitingTimeTotal = 0;
-        int aCT = 0;
+        int totalTurnAroundTime = 0;
+        int totalWaitingTime = 0;
 
+        for (CPUScheduling cpu : cpuProcesses) {
+            totalBurstTime += cpu.getBurstTime();
+            cpu.setTotalBurstTime(cpu.getBurstTime());
+        }
         System.out.println("Gantt Chart");
-
-        int completeProcess = 0;
-
-        ArrayList<CPUSceduling> newl = new ArrayList<>();
-
-        int currentTime = 0;
-        int completed = 0;
-        int cpuProcessesSize = cpuProcesses.size();
-        int lastArrival = Collections.max(cpuProcesses, Comparator.comparingInt(CPUSceduling::getArrivalTime)).getArrivalTime();
-
         switch (algorithmSelection) {
-            case 1: //FCFS
-                for (CPUSceduling cpu : cpuProcesses) {
+            case 1 -> {
+                totalIdleTime = FCFS();
+            }
+            case 2, 3 -> {
+                totalIdleTime = SJF(algorithmSelection);
+            }
+            case 4, 5 -> {
+                totalIdleTime = PRIORITY(algorithmSelection);
+            }
+        }
 
-                    if (cpu.getArrivalTime() > currentTime) {
-                        cpu.setCompletionTime(cpu.getArrivalTime());
-                        System.out.print("[ IDLE |" + currentTime + "-" + cpu.getCompletionTime() + " ] ");
-                        totalIdleTime += cpu.getArrivalTime() - currentTime;
-                        currentTime = cpu.getArrivalTime();
-                    }
-
-                    if (cpu.getArrivalTime() <= currentTime) {
-                        cpu.setCompletionTime(currentTime + cpu.getBurstTime());
-                        System.out.print("[ P" + cpu.getProcessID() + " | " + currentTime + "-" + cpu.getCompletionTime() + " ]");
-                        currentTime = cpu.getCompletionTime();
-                    }
-
-                    totalBurstTime += cpu.getBurstTime();
-
-                    cpu.setTurnAroundTime(cpu.getCompletionTime() - cpu.getArrivalTime());
-                    turnAroundTimeTotal += cpu.getTurnAroundTime();
-                    cpu.setWaitingTime(cpu.getTurnAroundTime() - cpu.getBurstTime());
-                    waitingTimeTotal += cpu.getWaitingTime();
-                }
-                System.out.print("\n\nFirst Come First Serve");
-                break;
-            case 2: //SJF/NP
-                while (completed < cpuProcessesSize) {
-                    ArrayList<CPUSceduling> available = new ArrayList<>();
-                    for (CPUSceduling cpu : cpuProcesses) {
-                        if (!cpu.isFinishedProcess() && cpu.getArrivalTime() <= currentTime) {
-                            available.add(cpu);
-                        }
-                    }
-                    
-                    if (available.isEmpty()) {
-                        int nextArrival = Integer.MAX_VALUE;
-                        for (CPUSceduling cpu : cpuProcesses) {
-                            if (!cpu.isFinishedProcess()) {
-                                nextArrival = Math.min(nextArrival, cpu.getArrivalTime());
-                            }
-                        }
-                        System.out.print("[ IDLE | " + currentTime + "-" + nextArrival + " ]");
-                        totalIdleTime += (nextArrival - currentTime);
-                        currentTime = nextArrival;
-                        continue;
-                    }
-
-                    CPUSceduling shortestProcess = Collections.min(available, Comparator.comparingInt(CPUSceduling::getBurstTime));
-
-                    System.out.print("[ P" + shortestProcess.getProcessID() + " | " + currentTime + "-");
-                    currentTime += shortestProcess.getBurstTime();
-                    shortestProcess.setCompletionTime(currentTime);
-                    shortestProcess.setFinishedProcess(true);
-                    System.out.print(shortestProcess.getCompletionTime() + " ]");
-
-                    shortestProcess.setTurnAroundTime(shortestProcess.getCompletionTime() - shortestProcess.getArrivalTime());
-                    shortestProcess.setWaitingTime(shortestProcess.getTurnAroundTime() - shortestProcess.getBurstTime());
-
-                    totalBurstTime += shortestProcess.getBurstTime();
-                    turnAroundTimeTotal += shortestProcess.getTurnAroundTime();
-                    waitingTimeTotal += shortestProcess.getWaitingTime();
-
-                    completed++;
-                }
-                System.out.print("\n\nShortest Job First / Non - Preemtive");
-                break;
-            case 3: //SJF/P
-                for (CPUSceduling cpu : cpuProcesses) {
-                    cpu.setTotalBurstTime(cpu.getBurstTime());
-                }
-
-                while (completed < cpuProcessesSize) {
-                    ArrayList<CPUSceduling> available = new ArrayList<>();
-                    for (CPUSceduling cpu : cpuProcesses) {
-                        if (!cpu.isFinishedProcess() && cpu.getArrivalTime() <= currentTime) {
-                            available.add(cpu);
-                        }
-                    }
-
-                    if (available.isEmpty()) {
-                        int nextArrival = Integer.MAX_VALUE;
-                        for (CPUSceduling cpu : cpuProcesses) {
-                            if (!cpu.isFinishedProcess()) {
-                                nextArrival = Math.min(nextArrival, cpu.getArrivalTime());
-                            }
-                        }
-                        System.out.print("[ IDLE | " + currentTime + "-" + nextArrival + " ]");
-                        totalIdleTime += (nextArrival - currentTime);
-                        currentTime = nextArrival;
-                        continue;
-                    }
-
-                    CPUSceduling current = Collections.min(available, Comparator.comparingInt(CPUSceduling::getTotalBurstTime));
-
-                    boolean allArrived = currentTime >= lastArrival;
-
-                    System.out.print("[ P" + current.getProcessID() + " | " + currentTime + "-");
-
-                    if (allArrived) {
-                        currentTime += current.getTotalBurstTime();
-                        current.setTotalBurstTime(0);
-                    } else {
-                        currentTime++;
-                        current.setTotalBurstTime(current.getTotalBurstTime() - 1);
-                    }
-
-                    System.out.print(currentTime + " ]");
-
-                    if (current.getTotalBurstTime() == 0) {
-                        current.setFinishedProcess(true);
-                        current.setCompletionTime(currentTime);
-                        completed++;
-                    }
-                }
-
-                for (CPUSceduling cpu : cpuProcesses) {
-                    cpu.setTurnAroundTime(cpu.getCompletionTime() - cpu.getArrivalTime());
-                    cpu.setWaitingTime(cpu.getTurnAroundTime() - cpu.getBurstTime());
-                    turnAroundTimeTotal += cpu.getTurnAroundTime();
-                    waitingTimeTotal += cpu.getWaitingTime();
-                    totalBurstTime += cpu.getBurstTime();
-                }
-                
-                System.out.print("\n\nShortest Job First / Preemtive");
-                break;
-            case 4: //PRIORITY/NP
-                while (completed < cpuProcessesSize) {
-                    // Get all available processes that have arrived
-                    ArrayList<CPUSceduling> available = new ArrayList<>();
-                    for (CPUSceduling cpu : cpuProcesses) {
-                        if (!cpu.isFinishedProcess() && cpu.getArrivalTime() <= currentTime) {
-                            available.add(cpu);
-                        }
-                    }
-
-                    // If no process has arrived yet → CPU idle
-                    if (available.isEmpty()) {
-                        int nextArrival = Integer.MAX_VALUE;
-                        for (CPUSceduling cpu : cpuProcesses) {
-                            if (!cpu.isFinishedProcess()) {
-                                nextArrival = Math.min(nextArrival, cpu.getArrivalTime());
-                            }
-                        }
-                        System.out.print("[ IDLE | " + currentTime + "-" + nextArrival + " ]");
-                        totalIdleTime += (nextArrival - currentTime);
-                        currentTime = nextArrival;
-                        continue;
-                    }
-
-                    CPUSceduling highestPriority = Collections.max(available, Comparator.comparingInt(CPUSceduling::getPriorityNumber));
-
-                    System.out.print("[ P" + highestPriority.getProcessID() + " | " + currentTime + "-");
-                    currentTime += highestPriority.getBurstTime();
-                    highestPriority.setCompletionTime(currentTime);
-                    highestPriority.setFinishedProcess(true);
-                    System.out.print(highestPriority.getCompletionTime() + " ]");
-
-                    highestPriority.setTurnAroundTime(highestPriority.getCompletionTime() - highestPriority.getArrivalTime());
-                    highestPriority.setWaitingTime(highestPriority.getTurnAroundTime() - highestPriority.getBurstTime());
-
-                    totalBurstTime += highestPriority.getBurstTime();
-                    turnAroundTimeTotal += highestPriority.getTurnAroundTime();
-                    waitingTimeTotal += highestPriority.getWaitingTime();
-
-                    completed++;
-                }
-                System.out.print("\n\nPriority / Non - Preemtive");
-                break;
-            case 5: //PRIORITY/P
-                for (CPUSceduling cpu : cpuProcesses) {
-                    cpu.setTotalBurstTime(cpu.getBurstTime());
-                }
-
-                while (completed < cpuProcessesSize) {
-                    ArrayList<CPUSceduling> available = new ArrayList<>();
-                    for (CPUSceduling cpu : cpuProcesses) {
-                        if (!cpu.isFinishedProcess() && cpu.getArrivalTime() <= currentTime) {
-                            available.add(cpu);
-                        }
-                    }
-
-                    if (available.isEmpty()) {
-                        int nextArrival = Integer.MAX_VALUE;
-                        for (CPUSceduling cpu : cpuProcesses) {
-                            if (!cpu.isFinishedProcess()) {
-                                nextArrival = Math.min(nextArrival, cpu.getArrivalTime());
-                            }
-                        }
-                        System.out.print("[ IDLE | " + currentTime + "-" + nextArrival + " ]");
-                        totalIdleTime += (nextArrival - currentTime);
-                        currentTime = nextArrival;
-                        continue;
-                    }
-
-                    CPUSceduling current = Collections.max(available, Comparator.comparingInt(CPUSceduling::getPriorityNumber));
-
-                    boolean allArrived = currentTime >= lastArrival;
-
-                    System.out.print("[ P" + current.getProcessID() + " | " + currentTime + "-");
-
-                    if (allArrived) {
-                        currentTime += current.getTotalBurstTime();
-                        current.setTotalBurstTime(0);
-                    } else {
-                        currentTime++;
-                        current.setTotalBurstTime(current.getTotalBurstTime() - 1);
-                    }
-
-                    System.out.print(currentTime + " ]");
-
-                    if (current.getTotalBurstTime() == 0) {
-                        current.setFinishedProcess(true);
-                        current.setCompletionTime(currentTime);
-                        completed++;
-                    }
-                }
-
-                for (CPUSceduling cpu : cpuProcesses) {
-                    cpu.setTurnAroundTime(cpu.getCompletionTime() - cpu.getArrivalTime());
-                    cpu.setWaitingTime(cpu.getTurnAroundTime() - cpu.getBurstTime());
-                    turnAroundTimeTotal += cpu.getTurnAroundTime();
-                    waitingTimeTotal += cpu.getWaitingTime();
-                    totalBurstTime += cpu.getBurstTime();
-                }
-                System.out.print("\n\nPriority / Preemtive");
-                break;
+        for (CPUScheduling cpu : cpuProcesses) {
+            cpu.setTurnAroundTime(cpu.getCompletionTime() - cpu.getArrivalTime());
+            totalTurnAroundTime += cpu.getTurnAroundTime();
+            cpu.setWaitingTime(cpu.getTurnAroundTime() - cpu.getBurstTime());
+            totalWaitingTime += cpu.getWaitingTime();
         }
 
         int ganttChartTotalValue = totalBurstTime + totalIdleTime;
-
         double cpuUtilization = ((double) totalBurstTime / (double) ganttChartTotalValue) * 100;
+        double aTT = (double) totalTurnAroundTime / (double) cpuProcesses.size();
+        double aWT = (double) totalWaitingTime / (double) cpuProcesses.size();
 
-        double aTT = (double) turnAroundTimeTotal / (double) cpuProcesses.size();
-
-        double aWT = (double) waitingTimeTotal / (double) cpuProcesses.size();
-
-        Collections.sort(cpuProcesses, Comparator.comparingInt(s -> s.getProcessID()));
-
-        output(cpuProcesses, algorithmSelection);
-
+        cpuProcesses.sort(Comparator.comparingInt(CPUScheduling::getProcessID));
+        output(algorithmSelection);
         performanceMetrics(cpuUtilization, aTT, aWT);
     }
 }
